@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {
     --signal: 80 200 255;
@@ -407,6 +408,81 @@ section.addEventListener(
 
 section.addEventListener(
   "mouseleave",
+  () => {
+
+    mouse.active = false;
+
+    mouse.targetX = -1000;
+
+    mouse.targetY = -1000;
+
+  }
+);
+
+
+/* =====================================================
+   TOUCH
+===================================================== */
+
+function updateTouch(
+  touch
+) {
+
+  const rect =
+    canvas.getBoundingClientRect();
+
+
+  mouse.targetX =
+    touch.clientX -
+    rect.left;
+
+
+  mouse.targetY =
+    touch.clientY -
+    rect.top;
+
+
+  mouse.active = true;
+
+}
+
+
+section.addEventListener(
+  "touchstart",
+  event => {
+
+    const touch =
+      event.touches[0];
+
+
+    if (touch) {
+      updateTouch(touch);
+    }
+
+  },
+  { passive: true }
+);
+
+
+section.addEventListener(
+  "touchmove",
+  event => {
+
+    const touch =
+      event.touches[0];
+
+
+    if (touch) {
+      updateTouch(touch);
+    }
+
+  },
+  { passive: true }
+);
+
+
+section.addEventListener(
+  "touchend",
   () => {
 
     mouse.active = false;
