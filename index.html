@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  :root {
+    --signal: 80 200 255;
+    --bg: #05070a;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: white;
+    font-family: Arial, sans-serif;
+  }
+
+  .spacer {
+    height: 70vh;
+    display: grid;
+    place-items: center;
+    color: #555;
+  }
+
+  .network-section {
+    position: relative;
+    height: clamp(15rem, 36vh, 26rem);
+    overflow: hidden;
+    border-top: 1px solid rgba(255,255,255,.12);
+    border-bottom: 1px solid rgba(255,255,255,.12);
+  }
+
+  .background {
+    position: absolute;
+    inset: -20%;
+
+    background:
+      radial-gradient(
+        70% 76% at 60% 54%,
+        rgb(var(--signal) / 0.18),
+        transparent 70%
+      );
+
+    transform:
+      translateY(var(--glow-y, 0px));
+
+    transition:
+      transform .1s linear;
+  }
+
+  canvas {
+    position: absolute;
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    transform:
+      translateY(var(--canvas-y, 0px))
+      scale(var(--scale, 1));
+
+    transition:
+      transform .1s linear,
+      opacity .2s linear;
+  }
+
+  .grid {
+    position: absolute;
+    inset: 0;
+
+    pointer-events: none;
+
+    background-image:
+      linear-gradient(
+        rgba(255,255,255,.035) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        rgba(255,255,255,.035) 1px,
+        transparent 1px
+      );
+
+    background-size: 40px 40px;
+
+    transform:
+      translateY(var(--grid-y, 0px));
+
+    opacity: .5;
+  }
+
+  .title {
+    position: absolute;
+    inset: 0;
+
+    display: grid;
+    place-items: center;
+
+    z-index: 5;
+
+    font-size:
+      clamp(1.5rem, 4vw, 3rem);
+
+    letter-spacing: .15em;
+
+    text-transform: uppercase;
+
+    pointer-events: none;
+
+    transform:
+      translateY(var(--text-y, 0px));
+
+    opacity:
+      var(--text-opacity, 1);
+
+    text-shadow:
+      0 0 30px
+      rgba(100,200,255,.15);
+  }
+</style>
+</head>
+
+<body>
+
+<div class="spacer">
+  SCROLL DOWN ↓
+</div>
+
+<section
+  class="network-section"
+  id="networkSection"
+>
+
+  <div class="background"></div>
+
+  <canvas id="network"></canvas>
+
+  <div class="grid"></div>
+
+  <div class="title">
+    NETWORK
+  </div>
+
+</section>
+
+<div class="spacer">
+  KEEP SCROLLING
+</div>
+
+
+<script>
+
+const section =
+  document.getElementById(
+    "networkSection"
+  );
+
+const canvas =
+  document.getElementById(
+    "network"
+  );
+
+const ctx =
+  canvas.getContext("2d");
+
+
+let width;
+let height;
+
+let particles = [];
+
+let time = 0;
+
+
+/* =====================================================
+   MOUSE
+===================================================== */
+
+const mouse = {
+
+  x: -1000,
+  y: -1000,
+
+  targetX: -1000,
+  targetY: -1000,
+
+  active: false,
+
+  velocityX: 0,
+  velocityY: 0,
+
+  previousX: -1000,
+  previousY: -1000
+
+};
+
+
+/* =====================================================
+   SETTINGS
+===================================================== */
+
+
+/*
+  Overall automatic movement
+*/
+
+const AUTO_SPEED = 0.00035;
+
+
+/*
+  Slow rotation.
+*/
+
+const ROTATION_SPEED = 0.00018;
+
+
+/*
+  How much the network
+  rotates.
+*/
+
+const ROTATION_AMOUNT = 0.25;
+
+
+/*
+  Mouse interaction.
+*/
+
+const MOUSE_RADIUS = 170;
+
+const MOUSE_FORCE = 3.5;
+
+
+/*
+  Background wave.
+*/
+
+const AMBIENT_WAVE = 10;
+
+
+/* =====================================================
+   RESIZE
+===================================================== */
+
+function resize() {
+
+  width =
+    canvas.clientWidth;
+
+  height =
+    canvas.clientHeight;
+
+
+  canvas.width =
+    width *
+    devicePixelRatio;
+
+  canvas.height =
+    height *
+    devicePixelRatio;
+
+
+  ctx.setTransform(
+
+    devicePixelRatio,
+    0,
+    0,
+    devicePixelRatio,
+    0,
+    0
+
+  );
+
+
+  createParticles();
+
+}
+
+
+/* =====================================================
+   CREATE PARTICLES
+===================================================== */
+
+function createParticles() {
+
+  particles = [];
+
+
+  /*
+    Create a loose structured
+    network instead of completely
+    random points.
+  */
+
+  const spacing = 65;
+
+
+  for (
+    let x = -spacing;
+    x < width + spacing;
+    x += spacing
+  ) {
+
+    for (
+      let y = -spacing;
+      y < height + spacing;
+      y += spacing
+    ) {
+
+
+      /*
+        Slight randomisation makes
+        the network organic.
+      */
+
+      const offsetX =
+        (Math.random() - .5)
+        * 35;
+
+
+      const offsetY =
+        (Math.random() - .5)
+        * 35;
+
+
+      particles.push({
+
+        baseX:
+          x + offsetX,
+
+        baseY:
+          y + offsetY,
+
+
+        x:
+          x + offsetX,
+
+        y:
+          y + offsetY,
+
+
+        vx: 0,
+
+        vy: 0,
+
+
+        phase:
+          Math.random()
+          * Math.PI
+          * 2,
+
+
+        size:
+          Math.random()
+          * 1.3
+          + .6
+
+      });
+
+    }
+
+  }
+
+}
+
+
+/* =====================================================
+   MOUSE
+===================================================== */
+
+section.addEventListener(
+  "mousemove",
+  event => {
+
+    const rect =
+      canvas.getBoundingClientRect();
+
+
+    mouse.targetX =
+      event.clientX -
+      rect.left;
+
+
+    mouse.targetY =
+      event.clientY -
+      rect.top;
+
+
+    mouse.active = true;
+
+  }
+);
+
+
+section.addEventListener(
+  "mouseenter",
+  () => {
+
+    mouse.active = true;
+
+  }
+);
+
+
+section.addEventListener(
+  "mouseleave",
+  () => {
+
+    mouse.active = false;
+
+    mouse.targetX = -1000;
+
+    mouse.targetY = -1000;
+
+  }
+);
+
+
+/* =====================================================
+   ROTATION
+===================================================== */
+
+function rotatePoint(
+  x,
+  y,
+  angle
+) {
+
+  const centerX =
+    width / 2;
+
+  const centerY =
+    height / 2;
+
+
+  const dx =
+    x - centerX;
+
+  const dy =
+    y - centerY;
+
+
+  const cos =
+    Math.cos(angle);
+
+  const sin =
+    Math.sin(angle);
+
+
+  return {
+
+    x:
+      centerX +
+      dx * cos -
+      dy * sin,
+
+    y:
+      centerY +
+      dx * sin +
+      dy * cos
+
+  };
+
+}
+
+
+/* =====================================================
+   ANIMATION
+===================================================== */
+
+function animate() {
+
+  time += 1;
+
+
+  ctx.clearRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  /* ===================================================
+     SMOOTH MOUSE
+  =================================================== */
+
+  const oldX =
+    mouse.x;
+
+  const oldY =
+    mouse.y;
+
+
+  mouse.x +=
+    (mouse.targetX -
+      mouse.x) * .12;
+
+
+  mouse.y +=
+    (mouse.targetY -
+      mouse.y) * .12;
+
+
+  mouse.velocityX =
+    mouse.x - oldX;
+
+  mouse.velocityY =
+    mouse.y - oldY;
+
+
+  /* ===================================================
+     AUTOMATIC ROTATION
+  =================================================== */
+
+  const rotation =
+    Math.sin(
+      time *
+      ROTATION_SPEED
+    ) *
+    ROTATION_AMOUNT;
+
+
+  /* ===================================================
+     UPDATE PARTICLES
+  =================================================== */
+
+  for (
+    const p of particles
+  ) {
+
+
+    /*
+      -----------------------------------------------
+      Automatic wave
+      -----------------------------------------------
+    */
+
+    const ambientX =
+
+      Math.sin(
+        time * .015 +
+        p.phase +
+        p.baseY * .015
+      )
+      *
+      AMBIENT_WAVE;
+
+
+    const ambientY =
+
+      Math.cos(
+        time * .012 +
+        p.phase +
+        p.baseX * .01
+      )
+      *
+      AMBIENT_WAVE
+      * .6;
+
+
+    /*
+      -----------------------------------------------
+      Rotated base position
+      -----------------------------------------------
+    */
+
+    const rotated =
+      rotatePoint(
+        p.baseX + ambientX,
+        p.baseY + ambientY,
+        rotation
+      );
+
+
+    /*
+      -----------------------------------------------
+      Pull particle toward
+      moving target position
+      -----------------------------------------------
+    */
+
+    p.vx +=
+      (rotated.x - p.x)
+      * .015;
+
+
+    p.vy +=
+      (rotated.y - p.y)
+      * .015;
+
+
+    /* =================================================
+       MOUSE DISTURBANCE
+    ================================================= */
+
+    if (mouse.active) {
+
+      const dx =
+        p.x - mouse.x;
+
+      const dy =
+        p.y - mouse.y;
+
+
+      const distance =
+        Math.sqrt(
+          dx * dx +
+          dy * dy
+        );
+
+
+      if (
+        distance <
+        MOUSE_RADIUS
+      ) {
+
+
+        /*
+          Strongest at cursor.
+        */
+
+        const influence =
+
+          1 -
+          distance /
+          MOUSE_RADIUS;
+
+
+        const angle =
+          Math.atan2(
+            dy,
+            dx
+          );
+
+
+        /*
+          Push particles away.
+        */
+
+        p.vx +=
+
+          Math.cos(angle) *
+          influence *
+          MOUSE_FORCE;
+
+
+        p.vy +=
+
+          Math.sin(angle) *
+          influence *
+          MOUSE_FORCE;
+
+
+        /*
+          Mouse movement itself
+          creates extra momentum.
+        */
+
+        p.vx +=
+
+          mouse.velocityX *
+          influence *
+          .18;
+
+
+        p.vy +=
+
+          mouse.velocityY *
+          influence *
+          .18;
+
+
+        /*
+          Ripple wave.
+        */
+
+        const wave =
+
+          Math.sin(
+            distance * .13 -
+            time * .12
+          )
+          *
+          influence
+          * 8;
+
+
+        p.x +=
+
+          Math.cos(angle) *
+          wave;
+
+
+        p.y +=
+
+          Math.sin(angle) *
+          wave;
+
+      }
+
+    }
+
+
+    /* =================================================
+       FRICTION
+    ================================================= */
+
+    p.vx *= .91;
+
+    p.vy *= .91;
+
+
+    p.x += p.vx;
+
+    p.y += p.vy;
+
+  }
+
+
+  /* ===================================================
+     DRAW CONNECTIONS
+  =================================================== */
+
+  for (
+    let i = 0;
+    i < particles.length;
+    i++
+  ) {
+
+    for (
+      let j = i + 1;
+      j < particles.length;
+      j++
+    ) {
+
+
+      const a =
+        particles[i];
+
+      const b =
+        particles[j];
+
+
+      const dx =
+        a.x - b.x;
+
+      const dy =
+        a.y - b.y;
+
+
+      const distance =
+        Math.sqrt(
+          dx * dx +
+          dy * dy
+        );
+
+
+      if (
+        distance < 105
+      ) {
+
+
+        let opacity =
+
+          1 -
+          distance /
+          105;
+
+
+        /*
+          Brighten connections
+          near mouse.
+        */
+
+        if (
+          mouse.active
+        ) {
+
+          const midX =
+            (a.x + b.x) / 2;
+
+          const midY =
+            (a.y + b.y) / 2;
+
+
+          const mdx =
+            midX -
+            mouse.x;
+
+          const mdy =
+            midY -
+            mouse.y;
+
+
+          const mouseDistance =
+
+            Math.sqrt(
+              mdx * mdx +
+              mdy * mdy
+            );
+
+
+          if (
+            mouseDistance <
+            MOUSE_RADIUS
+          ) {
+
+            const glow =
+
+              1 -
+              mouseDistance /
+              MOUSE_RADIUS;
+
+
+            opacity +=
+              glow * .6;
+
+          }
+
+        }
+
+
+        ctx.beginPath();
+
+
+        ctx.moveTo(
+          a.x,
+          a.y
+        );
+
+
+        ctx.lineTo(
+          b.x,
+          b.y
+        );
+
+
+        ctx.strokeStyle =
+
+          `rgba(
+            100,
+            200,
+            255,
+            ${Math.min(
+              opacity * .3,
+              .8
+            )}
+          )`;
+
+
+        ctx.lineWidth =
+          1;
+
+
+        ctx.stroke();
+
+      }
+
+    }
+
+  }
+
+
+  /* ===================================================
+     DRAW PARTICLES
+  =================================================== */
+
+  for (
+    const p of particles
+  ) {
+
+
+    let radius =
+      p.size;
+
+
+    let alpha =
+      .75;
+
+
+    if (
+      mouse.active
+    ) {
+
+      const dx =
+        p.x -
+        mouse.x;
+
+      const dy =
+        p.y -
+        mouse.y;
+
+
+      const distance =
+        Math.sqrt(
+          dx * dx +
+          dy * dy
+        );
+
+
+      if (
+        distance <
+        MOUSE_RADIUS
+      ) {
+
+        const influence =
+
+          1 -
+          distance /
+          MOUSE_RADIUS;
+
+
+        radius +=
+          influence * 3;
+
+
+        alpha +=
+          influence * .25;
+
+      }
+
+    }
+
+
+    ctx.beginPath();
+
+
+    ctx.arc(
+
+      p.x,
+      p.y,
+
+      radius,
+
+      0,
+      Math.PI * 2
+
+    );
+
+
+    ctx.fillStyle =
+
+      `rgba(
+        150,
+        220,
+        255,
+        ${alpha}
+      )`;
+
+
+    ctx.fill();
+
+  }
+
+
+  /* ===================================================
+     MOUSE GLOW
+  =================================================== */
+
+  if (
+    mouse.active
+  ) {
+
+
+    const gradient =
+
+      ctx.createRadialGradient(
+
+        mouse.x,
+        mouse.y,
+        0,
+
+        mouse.x,
+        mouse.y,
+        MOUSE_RADIUS
+
+      );
+
+
+    gradient.addColorStop(
+
+      0,
+
+      "rgba(80,200,255,.18)"
+
+    );
+
+
+    gradient.addColorStop(
+
+      .3,
+
+      "rgba(80,200,255,.08)"
+
+    );
+
+
+    gradient.addColorStop(
+
+      1,
+
+      "rgba(80,200,255,0)"
+
+    );
+
+
+    ctx.beginPath();
+
+
+    ctx.arc(
+
+      mouse.x,
+      mouse.y,
+
+      MOUSE_RADIUS,
+
+      0,
+      Math.PI * 2
+
+    );
+
+
+    ctx.fillStyle =
+      gradient;
+
+
+    ctx.fill();
+
+  }
+
+
+  requestAnimationFrame(
+    animate
+  );
+
+}
+
+
+/* =====================================================
+   SCROLL EFFECT
+===================================================== */
+
+let scrollVelocity = 0;
+
+let previousScroll =
+  window.scrollY;
+
+
+function handleScroll() {
+
+  const currentScroll =
+    window.scrollY;
+
+
+  scrollVelocity =
+    currentScroll -
+    previousScroll;
+
+
+  previousScroll =
+    currentScroll;
+
+
+  const rect =
+    section.getBoundingClientRect();
+
+
+  const viewportHeight =
+    window.innerHeight;
+
+
+  let progress =
+
+    (
+      viewportHeight -
+      rect.top
+    ) /
+    (
+      viewportHeight +
+      rect.height
+    );
+
+
+  progress =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        progress
+      )
+    );
+
+
+  const canvasY =
+    (progress - .5)
+    * -80;
+
+
+  const gridY =
+    (progress - .5)
+    * -30;
+
+
+  const glowY =
+    (progress - .5)
+    * -120;
+
+
+  const scale =
+    .96 +
+    progress *
+    .08;
+
+
+  const textY =
+    (progress - .5)
+    * -40;
+
+
+  let opacity = 1;
+
+
+  if (
+    progress < .15
+  ) {
+
+    opacity =
+      progress / .15;
+
+  }
+
+
+  if (
+    progress > .85
+  ) {
+
+    opacity =
+      (1 - progress) / .15;
+
+  }
+
+
+  section.style.setProperty(
+    "--canvas-y",
+    `${canvasY}px`
+  );
+
+
+  section.style.setProperty(
+    "--grid-y",
+    `${gridY}px`
+  );
+
+
+  section.style.setProperty(
+    "--glow-y",
+    `${glowY}px`
+  );
+
+
+  section.style.setProperty(
+    "--scale",
+    scale
+  );
+
+
+  section.style.setProperty(
+    "--text-y",
+    `${textY}px`
+  );
+
+
+  section.style.setProperty(
+    "--text-opacity",
+    opacity
+  );
+
+
+  scrollVelocity *= .85;
+
+}
+
+
+window.addEventListener(
+  "scroll",
+  handleScroll,
+  { passive: true }
+);
+
+
+window.addEventListener(
+  "resize",
+  resize
+);
+
+
+/* =====================================================
+   START
+===================================================== */
+
+resize();
+
+animate();
+
+handleScroll();
+
+</script>
+
+</body>
+</html>
